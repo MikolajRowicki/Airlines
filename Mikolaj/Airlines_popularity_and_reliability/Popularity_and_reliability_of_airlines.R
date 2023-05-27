@@ -139,7 +139,7 @@ result_number_and_fraction_of_flights_of_each_carrier_for_each_year <- read_data
 read_dataframes_from_csv <- function(file_prefix) {
   dataframes <- list()
   for (i in 1:22) {
-    filename <- paste0("Mikolaj/DataFrames", file_prefix, "/", file_prefix, "_", i + 1986, ".csv")
+    filename <- paste0(file_prefix, "/", file_prefix, "_", i + 1986, ".csv")
     df <- read.csv(filename)
     dataframes[[i]] <- df
   }
