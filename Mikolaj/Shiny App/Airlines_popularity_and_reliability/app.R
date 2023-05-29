@@ -1,0 +1,397 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+setwd("DataSets")
+
+
+carriers <- read.csv("carriers.csv")
+
+Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
+
+read_dataframes_from_csv <- function(file_prefix) {
+  dataframes <- list()
+  for (i in 1:22) {
+    filename <- paste0(file_prefix, "/", file_prefix, "_", i + 1986, ".csv")
+    df <- read.csv(filename)
+    dataframes[[i]] <- df
+  }
+  return(dataframes)
+}
+
+plot_of_fraction_of_delays_of_most_popular_carriers <- function(df_list, name_1, name_2){
+  
+  
+  filtered_df_list <- lapply(df_list, function(df) {
+    df %>%
+      select(UniqueCarrier, AllFlights, DelayedFlights) %>%
+      filter(UniqueCarrier %in% c(name_1, name_2)) %>%
+      arrange(match(UniqueCarrier, c(name_1, name_2)))
+  })
+  
+  check_and_add_rows <- function(df_list, name_1, name_2) {
+    for (i in seq_along(df_list)) {
+      if (!(name_1 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_1, AllFlights = 0, DelayedFlights = 0)
+        df_list[[i]] <- rbind(new_row, df_list[[i]])
+      }
+      
+      if (!(name_2 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_2, AllFlights = 0, DelayedFlights = 0)
+        df_list[[i]] <- rbind(df_list[[i]], new_row)
+      }
+    }
+    
+    return(df_list)
+  }
+  
+  filtered_df_list <- check_and_add_rows(filtered_df_list, name_1, name_2)
+  
+  
+  merged_df <- bind_cols(filtered_df_list)
+  
+  
+  for(i in c(3, 9, 15, 21, 27, 33, 39, 45, 51, 57 ,63)){
+    column_name <- paste0("Fraction_", i)
+    merged_df <- mutate(merged_df, !!column_name :=
+                          ifelse(rowSums(merged_df[, c(i - 1, i + 2)]) == 0, 0,
+                                 100 * (merged_df[, i] + merged_df[, i + 3]) /
+                                   (merged_df[, i - 1] + merged_df[, i + 2])))
+    
+    
+  }
+  
+  # Uwaga ! Okazało się, że ramki z lat 1986 i 2008 są niepełne i fałszują wyniki. Dlatego rozważam okres 1988 - 2006
+  merged_df <- merged_df[, c(1, 68:76)]
+  
+  colnames(merged_df) <- c("UniqueCarrier", paste0("Fraction_", "89-90"), paste0("Fraction_", "91-92"), paste0("Fraction_",  "93-94"),
+                           paste0("Fraction_",  "95-96"), paste0("Fraction_",  "97-98"), paste0("Fraction_", "99-00"), paste0("Fraction_", "01-02"), paste0("Fraction_", "03-04"), paste0("Fraction_","05-06"))
+  
+  merged_df <- merged_df %>%
+    pivot_longer(cols = starts_with("Fraction"), names_to = "Year", values_to = "Fraction") %>%
+    mutate(Year = substring(Year, nchar(Year) - 4))
+  
+  merged_df <- merged_df %>%
+    left_join(carriers, join_by("UniqueCarrier" == "Code")) %>%
+    select(-UniqueCarrier) %>%
+    select(c("Description", "Year", "Fraction"))
+  
+  
+  ggplot(merged_df, aes(x = Year, y = Fraction, fill = sub("^(.*?)\\s*\\(.*\\)$", "\\1", Description))) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(x = "Lata", y = "Loty opóżnione [%]", fill = "Linie lotnicze", title = "Jaka część lotów była opóźniona?") +
+    scale_x_discrete(limits = unique(merged_df$Year)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12), 
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+          axis.text.y = element_text(size = 12),
+          axis.title.x = element_text(size = 14, margin = margin(b = 35, t = 15)),  
+          axis.title.y = element_text(size = 14, margin = margin(r = 38)),
+          legend.text = element_text(size = 14) , 
+          legend.title = element_text(size = 14)) 
+  
+}
+
+plot_of_popularity_of_most_popular_carriers <- function(df_list, name_1, name_2){
+  filtered_df_list <- lapply(df_list, function(df) {
+    df %>%
+      select(UniqueCarrier, Sum) %>%
+      filter(UniqueCarrier %in% c(name_1, name_2)) %>%
+      arrange(match(UniqueCarrier, c(name_1, name_2)))
+  })
+  
+  check_and_add_rows <- function(df_list, name_1, name_2) {
+    for (i in seq_along(df_list)) {
+      if (!(name_1 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_1, Sum = 0)
+        df_list[[i]] <- rbind(new_row, df_list[[i]])
+      }
+      
+      if (!(name_2 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_2, Sum = 0)
+        df_list[[i]] <- rbind(df_list[[i]], new_row)
+        
+      }
+      
+      
+    }
+    
+    return(df_list)
+  }
+  
+  filtered_df_list <- check_and_add_rows(filtered_df_list, name_1, name_2)
+  
+  merged_df <- bind_cols(filtered_df_list)
+  
+  for(i in c(2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42)){
+    column_name <- paste0("Sum_", i)
+    merged_df <- mutate(merged_df, !!column_name := (merged_df[, i] + merged_df[, i + 2]))
+  }
+  
+  merged_df <- merged_df[, c(1, 46:54)]
+  
+  colnames(merged_df) <- c("UniqueCarrier", paste0("Fraction_", "89-90"), paste0("Fraction_", "91-92"), paste0("Fraction_",  "93-94"),
+                           paste0("Fraction_",  "95-96"), paste0("Fraction_",  "97-98"), paste0("Fraction_", "99-00"), paste0("Fraction_", "01-02"), paste0("Fraction_", "03-04"), paste0("Fraction_","05-06"))
+  
+  merged_df <- merged_df %>%
+    pivot_longer(cols = starts_with("Fraction"), names_to = "Year", values_to = "Fraction") %>%
+    mutate(Year = substring(Year, nchar(Year) - 4))
+  
+  merged_df <- merged_df %>%
+    left_join(carriers, join_by("UniqueCarrier" == "Code")) %>%
+    select(-UniqueCarrier) %>%
+    select(c("Description", "Year", "Fraction"))
+  
+  
+  ggplot(merged_df, aes(x = Year, y = Fraction, fill = sub("^(.*?)\\s*\\(.*\\)$", "\\1", Description))) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(x = "Lata", y = "Liczba lotów", fill = "Linie lotnicze", title = "Popularność linii lotniczych") +
+    scale_x_discrete(limits = unique(merged_df$Year)) +
+    scale_y_continuous(labels = scales::comma) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12), 
+          plot.title = element_text(hjust = 0.5, size = 18, face = "bold"), 
+          axis.text.y = element_text(size = 12),
+          axis.title.x = element_text(size = 14, margin = margin(b = 35, t = 15)), 
+          axis.title.y = element_text(size = 14),
+          legend.text = element_text(size = 14), 
+          legend.title = element_text(size = 14)) 
+}
+
+plot_of_cancelled_flights <- function(df_list, name_1, name_2) {
+  
+  filtered_df_list <- lapply(df_list, function(df) {
+    df %>%
+      select(UniqueCarrier, AllFlights, CancelledFlights) %>%
+      filter(UniqueCarrier %in% c(name_1, name_2)) %>%
+      arrange(match(UniqueCarrier, c(name_1, name_2)))
+  })
+  
+  check_and_add_rows <- function(df_list, name_1, name_2) {
+    for (i in seq_along(df_list)) {
+      if (!(name_1 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_1, AllFlights = 0, CancelledFlights = 0)
+        df_list[[i]] <- rbind(new_row, df_list[[i]])
+      }
+      
+      if (!(name_2 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_2, AllFlights = 0, CancelledFlights = 0)
+        df_list[[i]] <- rbind(df_list[[i]], new_row)
+      }
+    }
+    
+    return(df_list)
+  }
+  
+  filtered_df_list <- check_and_add_rows(filtered_df_list, name_1, name_2)
+  
+  
+  merged_df <- bind_cols(filtered_df_list)
+  
+  
+  for(i in c(3, 9, 15, 21, 27, 33, 39, 45, 51, 57 ,63)){
+    column_name <- paste0("Fraction_", i)
+    merged_df <- mutate(merged_df, !!column_name :=
+                          ifelse(rowSums(merged_df[, c(i - 1, i + 2)]) == 0, 0,
+                                 100 * (merged_df[, i] + merged_df[, i + 3]) /
+                                   (merged_df[, i - 1] + merged_df[, i + 2])))
+    
+    
+  }
+  
+  merged_df <- merged_df[, c(1, 68:76)]
+  
+  colnames(merged_df) <- c("UniqueCarrier", paste0("Fraction_", "89-90"), paste0("Fraction_", "91-92"), paste0("Fraction_",  "93-94"),
+                           paste0("Fraction_",  "95-96"), paste0("Fraction_",  "97-98"), paste0("Fraction_", "99-00"), paste0("Fraction_", "01-02"), paste0("Fraction_", "03-04"), paste0("Fraction_","05-06"))
+  
+  merged_df <- merged_df %>%
+    pivot_longer(cols = starts_with("Fraction"), names_to = "Year", values_to = "Fraction") %>%
+    mutate(Year = substring(Year, nchar(Year) - 4))
+  
+  merged_df <- merged_df %>%
+    left_join(carriers, join_by("UniqueCarrier" == "Code")) %>%
+    select(-UniqueCarrier) %>%
+    select(c("Description", "Year", "Fraction"))
+  
+  
+  ggplot(merged_df, aes(x = Year, y = Fraction, fill = sub("^(.*?)\\s*\\(.*\\)$", "\\1", Description))) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(x = "Lata", y = "Loty odwołane [%]", fill = "Linie lotnicze", title = "Jaka część lotów była odwołana?") +
+    scale_x_discrete(limits = unique(merged_df$Year)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12), 
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+          axis.text.y = element_text(size = 12),
+          axis.title.x = element_text(size = 14, margin = margin(b = 35, t =15)),  
+          axis.title.y = element_text(size = 14, margin = margin(r = 35)),
+          legend.text = element_text(size = 14), 
+          legend.title = element_text(size = 14))
+  
+}
+
+
+plot_of_delay_times_for_each_year <- function(df_list, name_1, name_2){
+  
+  
+  filtered_df_list <- lapply(df_list, function(df) {
+    df %>%
+      select(UniqueCarrier, DelayedFlights, DelayTime) %>%
+      filter(UniqueCarrier %in% c(name_1, name_2)) %>%
+      arrange(match(UniqueCarrier, c(name_1, name_2)))
+  })
+  
+  check_and_add_rows <- function(df_list, name_1, name_2) {
+    for (i in seq_along(df_list)) {
+      if (!(name_1 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_1, DelayedFlights = 0, DelayTime = 0)
+        df_list[[i]] <- rbind(new_row, df_list[[i]])
+      }
+      
+      if (!(name_2 %in% df_list[[i]]$UniqueCarrier)) {
+        new_row <- data.frame(UniqueCarrier = name_2, DelayedFlights = 0, DelayTime = 0)
+        df_list[[i]] <- rbind(df_list[[i]], new_row)
+      }
+    }
+    
+    return(df_list)
+  }
+  
+  filtered_df_list <- check_and_add_rows(filtered_df_list, name_1, name_2)
+  
+  
+  merged_df <- bind_cols(filtered_df_list)
+  
+  
+  for(i in c(3, 9, 15, 21, 27, 33, 39, 45, 51, 57 ,63)){
+    column_name <- paste0("Fraction_", i)
+    merged_df <- mutate(merged_df, !!column_name :=
+                          ifelse(rowSums(merged_df[, c(i - 1, i + 2)]) == 0, 0,
+                                  (merged_df[, i] + merged_df[, i + 3]) /
+                                   (merged_df[, i - 1] + merged_df[, i + 2])))
+    
+    
+  }
+  
+  # Uwaga ! Okazało się, że ramki z lat 1986 i 2008 są niepełne i fałszują wyniki. Dlatego rozważam okres 1988 - 2006
+  merged_df <- merged_df[, c(1, 68:76)]
+  
+  colnames(merged_df) <- c("UniqueCarrier", paste0("Fraction_", "89-90"), paste0("Fraction_", "91-92"), paste0("Fraction_",  "93-94"),
+                           paste0("Fraction_",  "95-96"), paste0("Fraction_",  "97-98"), paste0("Fraction_", "99-00"), paste0("Fraction_", "01-02"), paste0("Fraction_", "03-04"), paste0("Fraction_","05-06"))
+  
+  merged_df <- merged_df %>%
+    pivot_longer(cols = starts_with("Fraction"), names_to = "Year", values_to = "Fraction") %>%
+    mutate(Year = substring(Year, nchar(Year) - 4))
+  
+  merged_df <- merged_df %>%
+    left_join(carriers, join_by("UniqueCarrier" == "Code")) %>%
+    select(-UniqueCarrier) %>%
+    select(c("Description", "Year", "Fraction"))
+  
+  
+  ggplot(merged_df, aes(x = Year, y = Fraction, fill = sub("^(.*?)\\s*\\(.*\\)$", "\\1", Description))) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(x = "Lata", y = "Średni czas opóźnienia [min]", fill = "Linie lotnicze", title = "Jaki był średni czas opóźnienia?") +
+    scale_x_discrete(limits = unique(merged_df$Year)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12), 
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+          axis.text.y = element_text(size = 12),
+          axis.title.x = element_text(size = 14, margin = margin(b = 35, t = 15)),  
+          axis.title.y = element_text(size = 14, margin = margin(r = 38)),
+          legend.text = element_text(size = 14) , 
+          legend.title = element_text(size = 14)) 
+  
+}  
+
+
+result_number_and_fraction_of_flights_and_delays_for_each_year <- read_dataframes_from_csv("number_and_fraction_of_flights_and_delays_for_each_year")
+
+result_number_and_fraction_of_flights_of_each_carrier_for_each_year <- read_dataframes_from_csv("number_and_fraction_of_flights_of_each_carrier_for_each_year")
+
+result_cancelled_flights_for_each_year_for_each_carrier <- read_dataframes_from_csv("cancelled_flights_for_each_year_for_each_carrier")
+
+result_mean_of_delay_time_for_each_year <- read_dataframes_from_csv("mean_of_delay_time_for_each_year")
+
+library(shiny)
+library(dplyr)
+library(tidyverse)
+library(shinycssloaders)
+
+
+# Define UI for application that draws a histogram
+ui <- fluidPage(
+
+    # Application title
+    titlePanel("Analiza porównawcza linii lotniczych"),
+
+    # Sidebar with a slider input for number of bins 
+    ui <- fluidPage(
+      sidebarLayout(
+        sidebarPanel(
+          selectInput("variable1", "Wybierz nazwę pierwszej linii lotniczej:", choices = c("AirTran Airways Corporation (FL)", "Alaska Airlines Inc. (AS)", "Aloha Airlines Inc. (AQ)", "America West Airlines Inc. (HP)", "American Airlines Inc. (AA)", "American Eagle Airlines Inc. (MQ)", "ATA Airlines (TZ)", "Atlantic Southeast Airlines (EV)", "Comair Inc. (OH)", "Continental Air Lines Inc. (CO)", "Delta Air Lines Inc. (DL)", "Eastern Air Lines Inc. (EA)", "Expressjet Airlines Inc. (XE)", "Frontier Airlines Inc. (F9)", "Hawaiian Airlines Inc. (HA)", "Independence Air (DH)", "JetBlue Airways (B6)","Mesa Airlines Inc. (YV)","Midway Airlines Inc. (ML (1))", "Northwest Airlines Inc. (NW)", "Pacific Southwest Airlines (PS)", "Pan American World Airways (PA (1))","Piedmont Aviation Inc. (PI)" ,"Pinnacle Airlines Inc. (9E)", "Skywest Airlines Inc. (OO)", "Southwest Airlines Co. (WN)", "Trans World Airways LLC (TW)", "United Air Lines Inc. (UA)", "US Airways Inc. (US)")),
+          selectInput("variable2", "Wybierz nazwę drugiej linii lotniczej:", choices = c("AirTran Airways Corporation (FL)", "Alaska Airlines Inc. (AS)", "Aloha Airlines Inc. (AQ)", "America West Airlines Inc. (HP)", "American Airlines Inc. (AA)", "American Eagle Airlines Inc. (MQ)", "ATA Airlines (TZ)", "Atlantic Southeast Airlines (EV)", "Comair Inc. (OH)", "Continental Air Lines Inc. (CO)", "Delta Air Lines Inc. (DL)", "Eastern Air Lines Inc. (EA)", "Expressjet Airlines Inc. (XE)", "Frontier Airlines Inc. (F9)", "Hawaiian Airlines Inc. (HA)", "Independence Air (DH)", "JetBlue Airways (B6)","Mesa Airlines Inc. (YV)","Midway Airlines Inc. (ML (1))", "Northwest Airlines Inc. (NW)", "Pacific Southwest Airlines (PS)", "Pan American World Airways (PA (1))","Piedmont Aviation Inc. (PI)" ,"Pinnacle Airlines Inc. (9E)", "Skywest Airlines Inc. (OO)", "Southwest Airlines Co. (WN)", "Trans World Airways LLC (TW)", "United Air Lines Inc. (UA)", "US Airways Inc. (US)"))
+        ),
+        mainPanel(
+          plotOutput("plot1"),
+          plotOutput("plot2"),
+          plotOutput("plot4"),
+          plotOutput("plot3")
+        )
+      )
+    )
+)
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+  
+  output$plot2 <- renderPlot({
+    selected_var1 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable1)
+    selected_var2 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable2)
+    
+    if (!is.null(selected_var1) && !is.null(selected_var2)) {
+      plot_of_fraction_of_delays_of_most_popular_carriers(result_number_and_fraction_of_flights_and_delays_for_each_year, selected_var1, selected_var2)
+    } else {
+      # Render a message if both variables are not selected
+      plot(NULL, xlim = c(0, 1), ylim = c(0, 1), xlab = "", ylab = "", main = "Select two variables")
+    }
+  })
+  
+  output$plot1 <- renderPlot({
+    selected_var1 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable1)
+    selected_var2 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable2)
+    
+    if (!is.null(selected_var1) && !is.null(selected_var2)) {
+      plot_of_popularity_of_most_popular_carriers(result_number_and_fraction_of_flights_of_each_carrier_for_each_year, selected_var1, selected_var2)
+    } else {
+      # Render a message if both variables are not selected
+      plot(NULL, xlim = c(0, 1), ylim = c(0, 1), xlab = "", ylab = "", main = "Select two variables")
+    }
+  })
+  
+  output$plot3 <- renderPlot({
+    selected_var1 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable1)
+    selected_var2 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable2)
+    if (!is.null(selected_var1) && !is.null(selected_var2)) {
+      plot_of_cancelled_flights(result_cancelled_flights_for_each_year_for_each_carrier, selected_var1, selected_var2)
+    } else {
+      # Render a message if both variables are not selected
+      plot(NULL, xlim = c(0, 1), ylim = c(0, 1), xlab = "", ylab = "", main = "Select two variables")
+    }
+  })
+  output$plot4 <- renderPlot({
+    selected_var1 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable1)
+    selected_var2 <- gsub(".*\\((.*?)\\).*", "\\1", input$variable2)
+    if (!is.null(selected_var1) && !is.null(selected_var2)) {
+      plot_of_delay_times_for_each_year(result_mean_of_delay_time_for_each_year, selected_var1, selected_var2)
+    } else {
+      # Render a message if both variables are not selected
+      plot(NULL, xlim = c(0, 1), ylim = c(0, 1), xlab = "", ylab = "", main = "Select two variables")
+    }
+  })
+    
+}   
+    
+    # Run the application 
+    shinyApp(ui = ui, server = server)
+    
+

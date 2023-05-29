@@ -1,0 +1,14 @@
+name: airlines_popularity_and_reliability
+title:
+username:
+account: rowickim
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 9197221
+bundleId: 7277068
+url: https://rowickim.shinyapps.io/airlines_popularity_and_reliability/
+when: 1685363367.8794
+lastSyncTime: 1685363367.87941
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: bar_chart_2.png
