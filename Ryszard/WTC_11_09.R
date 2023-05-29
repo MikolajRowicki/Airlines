@@ -870,7 +870,7 @@ wykres_6_2 <- ggplot(data_frame_6, aes(x = factor(UniqueCarrier, levels = unique
               scale_y_continuous(breaks = seq(0, 15, by = 3),
                                  minor_breaks = seq(0, 20, by = 1)) +
               xlab("Linia lotnicza") +
-              ylab("Procent wszystkich lotów") +
+              ylab("Liczba lotów [%]") +
               theme(axis.title.x = element_text(face = "bold", size = 10, margin = margin(t = 10)),
                     axis.title.y = element_text(face = "bold", size = 10, margin = margin(r = 15)),
                     plot.title = element_text(face = "bold", hjust = 0.5, margin = margin(b = 20)), 
